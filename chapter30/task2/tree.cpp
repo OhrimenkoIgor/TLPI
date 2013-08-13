@@ -1,11 +1,11 @@
-
 #include "tree.h"
 
-TreeNode::TreeNode(const std::string & vkey,  void * vvalue) : data(vkey, vvalue), left(0), right(0) {
+TreeNode::TreeNode(const std::string & vkey, void * vvalue) :
+		data(vkey, vvalue), left(0), right(0) {
 
 }
 
-TreeNode::~TreeNode(){
+TreeNode::~TreeNode() {
 
 }
 
@@ -54,13 +54,20 @@ void add(Tree & tree, const char *key, void *value) {
  Если одного из детей нет, то значения полей ребёнка m ставим вместо соответствующих значений корневого узла,
  затирая его старые значения, и освобождаем память, занимаемую узлом m;
  Если оба ребёнка присутствуют, то
- Если левый узел m (6) правого поддерева отсутствует
- Копируем из (8) в (4) поля K, V и ссылку на правый узел.
- Иначе
- возьмем левый узел m (6), правого поддерева n->right (8);
- скопируем данные (кроме ссылок на дочерние элементы) из m (6) в n (4);
- рекурсивно удалим узел m (бывший 6).
+ Call the node to be deleted N. Do not delete N. Instead, choose either its in-order successor node or its in-order predecessor node, R.
+ Replace the value of N with the value of R, then delete R.
+ As with all binary trees, a node's in-order successor is the left-most child of its right subtree,
+ and a node's in-order predecessor is the right-most child of its left subtree. In either case, this node will have zero or one children.
+ Delete it according to one of the two simpler cases above.
  */
+
+static TreeNode * find_min(TreeNode * root) { //Gets minimum node (leftmost leaf) in a subtree
+	TreeNode * current_node = root;
+	while (current_node->left) {
+		current_node = current_node->left;
+	}
+	return current_node;
+}
 
 static void del(TreeNode* &tree, const char *key) {
 	if (tree == 0) {
@@ -99,15 +106,21 @@ static void del(TreeNode* &tree, const char *key) {
 	}
 
 	if (tree->left != 0 && tree->right != 0) {
-		if (tree->right->left == 0) {
-			TreeNode * tmp = tree->right;
-			tree->data = tree->right->data;
-			tree->right = tree->right->right;
-			delete tmp;
-		} else{
-			tree->data = tree->right->left->data;
-			del(tree->right->left, tree->right->left->data.key.c_str());
-		}
+		/*
+		 if (tree->right->left == 0) {
+		 TreeNode * tmp = tree->right;
+		 tree->data = tree->right->data;
+		 tree->right = tree->right->right;
+		 delete tmp;
+		 } else{
+		 tree->data = tree->right->left->data;
+		 del(tree->right->left, tree->right->left->data.key.c_str());
+		 }
+		 */
+
+		TreeNode * successor = find_min(tree->right);
+		tree->data = successor->data;
+		del(successor, successor->data.key.c_str());
 
 		return;
 	}
