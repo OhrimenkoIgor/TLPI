@@ -1,16 +1,37 @@
-#include "tree.h"
-
-TreeNode::TreeNode(const std::string & vkey, void * vvalue) :
-		data(vkey, vvalue), left(0), right(0) {
-
+extern "C" {
+#include "tlpi_hdr.h"
 }
 
-TreeNode::~TreeNode() {
+#include "tree.h"
 
+Mutex::Mutex() {
+	int s = pthread_mutex_init(&mutex, NULL);
+	if (s != 0)
+		errExitEN(s, "pthread_mutex_init");
+}
+
+Mutex::~Mutex() {
+	int s = pthread_mutex_destroy(&mutex); /* No longer needed */
+	if (s != 0)
+		errExitEN(s, "pthread_mutex_destroy");
+}
+
+void Mutex::lock() const {
+	int s = pthread_mutex_lock(&mutex);
+	if (s != 0)
+		errExitEN(s, "pthread_mutex_lock");
+}
+
+void Mutex::unlock() const {
+	int s = pthread_mutex_unlock(&mutex);
+	if (s != 0)
+		errExitEN(s, "pthread_mutex_unlock");
 }
 
 void initialize(Tree & tree) {
+	tree.lock();
 	tree.root = 0;
+	tree.unlock();
 }
 
 /*
@@ -21,26 +42,33 @@ void initialize(Tree & tree) {
  Если K=X, заменить V текущего узла новым значением. (хотя можно и организовать список значений V, но это другая тема)
  */
 
-static void add(TreeNode* &tree, const char *key, void *value) {
+static void add(TreeNode* &tree, const char *key, void *value,
+		Mutex* caller) {
+
 	if (tree == 0) {
 		tree = new TreeNode(key, value);
+		caller->unlock();
 		return;
 	}
+	tree->lock();
+	caller->unlock();
 	if (key > tree->data.key) {
-		add(tree->right, key, value);
+		add(tree->right, key, value, tree);
 		return;
 	}
 	if (key < tree->data.key) {
-		add(tree->left, key, value);
+		add(tree->left, key, value, tree);
 		return;
 	}
 	if (key == tree->data.key) {
 		tree->data.value = value;
 	}
+	tree->unlock();
 }
 
 void add(Tree & tree, const char *key, void *value) {
-	add(tree.root, key, value);
+	tree.lock();
+	add(tree.root, key, value, &tree);
 }
 
 /*
@@ -62,74 +90,76 @@ void add(Tree & tree, const char *key, void *value) {
  */
 
 static TreeNode * find_min(TreeNode * root) { //Gets minimum node (leftmost leaf) in a subtree
+	root->lock();
 	TreeNode * current_node = root;
-	while (current_node->left) {
-		current_node = current_node->left;
+	TreeNode * next_node = current_node->left;
+	while (next_node) {
+		next_node->lock();
+		current_node->unlock();
+		current_node = next_node;
+		next_node = current_node->left;
 	}
 	return current_node;
 }
 
-static void del(TreeNode* &tree, const char *key) {
+static void del(TreeNode* &tree, const char *key, Mutex* caller) {
 	if (tree == 0) {
+		caller->unlock();
 		return;
 	}
 
+
+	if (key == tree->data.key && tree->left == 0 && tree->right == 0) {
+		delete tree;
+		tree = 0;
+		caller->unlock();
+		return;
+	}
+
+	if (key == tree->data.key && tree->left != 0 && tree->right == 0) {
+		TreeNode * tmp = tree->right;
+		delete tree;
+		tree = tmp;
+		caller->unlock();
+		return;
+	}
+
+	if (key == tree->data.key && tree->left == 0 && tree->right != 0) {
+		TreeNode * tmp = tree->left;
+		delete tree;
+		tree = tmp;
+		caller->unlock();
+		return;
+	}
+
+	tree->lock();
+	caller->unlock();
+
 	if (key < tree->data.key) {
-		del(tree->left, key);
+		del(tree->left, key, tree);
 		return;
 	}
 
 	if (key > tree->data.key) {
-		del(tree->right, key);
+		del(tree->right, key, tree);
 		return;
 	}
 
-	//if (key == tree->key){
-	if (tree->left == 0 && tree->right == 0) {
-		delete tree;
-		tree = 0;
-		return;
-	}
-
-	if (tree->left != 0 && tree->right == 0) {
-		TreeNode * tmp = tree->right;
-		delete tree;
-		tree = tmp;
-		return;
-	}
-
-	if (tree->left == 0 && tree->right != 0) {
-		TreeNode * tmp = tree->left;
-		delete tree;
-		tree = tmp;
-		return;
-	}
-
-	if (tree->left != 0 && tree->right != 0) {
-		/*
-		 if (tree->right->left == 0) {
-		 TreeNode * tmp = tree->right;
-		 tree->data = tree->right->data;
-		 tree->right = tree->right->right;
-		 delete tmp;
-		 } else{
-		 tree->data = tree->right->left->data;
-		 del(tree->right->left, tree->right->left->data.key.c_str());
-		 }
-		 */
+	if (key == tree->data.key && tree->left != 0 && tree->right != 0) {
 
 		TreeNode * successor = find_min(tree->right);
 		tree->data = successor->data;
-		del(successor, successor->data.key.c_str());
+		successor->unlock(); //after lock() in find_min(tree->right);
+		del(successor, successor->data.key.c_str(), tree);
 
 		return;
 	}
 
-	//} //if (key == tree->key)
 }
 
 void del(Tree & tree, const char *key) {
-	del(tree.root, key);
+	tree.lock();
+	del(tree.root, key, &tree);
 }
 
 /*
@@ -140,23 +170,30 @@ void del(Tree & tree, const char *key) {
  Если K<X, рекурсивно искать ключ K в левом поддереве Т.
  */
 
-static bool lookup(const TreeNode * tree, const char *key, void **value) {
-	if (!tree)
+static bool lookup(const TreeNode * tree, const char *key, void **value, const Mutex* caller) {
+	if (!tree){
+		caller->unlock();
 		return false;
+	}
+	tree->lock();
+	caller->unlock();
 	if (key == tree->data.key) {
 		*value = tree->data.value;
+		tree->unlock();
 		return true;
 	}
 	if (key < tree->data.key) {
-		return lookup(tree->left, key, value);
+		return lookup(tree->left, key, value, tree);
 	}
 	if (key > tree->data.key) {
-		return lookup(tree->right, key, value);
+		return lookup(tree->right, key, value, tree);
 	}
+	tree->unlock();
 	return false;
 }
 
 bool lookup(const Tree & tree, const char *key, void **value) {
-	return lookup(tree.root, key, value);
+	tree.lock();
+	return lookup(tree.root, key, value, &tree);
 }
 
