@@ -1,10 +1,56 @@
 
-
 #include <cstring>
 #include <vector>
 #include <string>
 #include <sstream>
 #include <algorithm>
+#include <iostream>
+
+#include <pthread.h>
+
+extern "C" {
+#include "tlpi_hdr.h"
+}
+
+static const int BUFSIZE = 1024;
+
+static pthread_once_t once = PTHREAD_ONCE_INIT;
+static pthread_key_t strerrorKey;
+
+static void /* Free thread-specific data buffer */
+destructor(void *buf) {
+	free(buf);
+}
+
+static void /* One-time key creation function */
+createKey(void) {
+	int s;
+	/* Allocate a unique thread-specific data key and save the address
+	 of the destructor for thread-specific data buffers */
+	s = pthread_key_create(&strerrorKey, destructor);
+	if (s != 0)
+		errExitEN(s, "pthread_key_create");
+}
+
+static char * get_buffer() {
+	int s;
+	char *buf;
+	/* Make first caller allocate key for thread-specific data */
+	s = pthread_once(&once, createKey);
+	if (s != 0)
+		errExitEN(s, "pthread_once");
+	buf = (char *) pthread_getspecific(strerrorKey);
+	if (buf == NULL) { /* If first call from this thread, allocate
+	 buffer for thread, and save its location */
+		buf = (char *) malloc(BUFSIZE);
+		if (buf == NULL)
+			errExit("malloc");
+		s = pthread_setspecific(strerrorKey, (void *) buf);
+		if (s != 0)
+			errExitEN(s, "pthread_setspecific");
+	}
+	return buf;
+}
 
 std::vector<std::string> &split(const std::string &s, char delim,
 		std::vector<std::string> &elems) {
@@ -23,9 +69,8 @@ std::vector<std::string> split(const std::string &s, char delim) {
 	return elems;
 }
 
-char buffer[1024];
-
 char *my_dirname(const char *pathname) {
+	char * buffer = get_buffer();
 	if (!pathname) {
 		strcpy(buffer, ".");
 		return buffer;
@@ -41,12 +86,12 @@ char *my_dirname(const char *pathname) {
 		}
 	} else {
 		std::string ret("");
-		for (std::vector<std::string>::iterator it = v.begin(); it != v.end() - 1;
-				it++) {
+		for (std::vector<std::string>::iterator it = v.begin();
+				it != v.end() - 1; it++) {
 			ret += "/";
 			ret += *it;
 		}
-		if(ret == "")
+		if (ret == "")
 			ret = ".";
 		strcpy(buffer, ret.c_str());
 	}
@@ -54,6 +99,7 @@ char *my_dirname(const char *pathname) {
 }
 
 char *my_basename(const char *pathname) {
+	char * buffer = get_buffer();
 	if (!pathname) {
 		strcpy(buffer, ".");
 		return buffer;
@@ -72,68 +118,4 @@ char *my_basename(const char *pathname) {
 	}
 	return buffer;
 }
-
-
-
-int test() {
-
-	/*
-	 / 					/ 			/
-	 /usr/bin/zip	 	/usr/bin 	zip
-	 /etc/passwd////	/etc 		passwd
-	 /etc////passwd 	/etc 		passwd
-	 etc/passwd		 	etc 		passwd
-	 passwd 			. 			passwd
-	 passwd/ 			. 			passwd
-	 .. 				. 			..
-	 NULL 				.			 .
-	 */
-
-	char * ret;
-	ret = my_basename("/ ");
-	std::cout << ret << std::endl;
-	ret = my_dirname("/ ");
-	std::cout << ret << std::endl << std::endl;
-
-	ret = my_basename(" /usr/bin/zip");
-	std::cout << ret << std::endl;
-	ret = my_dirname(" /usr/bin/zip");
-	std::cout << ret << std::endl << std::endl;
-
-	ret = my_basename("/etc/passwd////");
-	std::cout << ret << std::endl;
-	ret = my_dirname("/etc/passwd////");
-	std::cout << ret << std::endl << std::endl;
-
-	ret = my_basename(" /etc////passwd");
-	std::cout << ret << std::endl;
-	ret = my_dirname(" /etc////passwd");
-	std::cout << ret << std::endl << std::endl;
-
-	ret = my_basename("passwd");
-	std::cout << ret << std::endl;
-	ret = my_dirname("passwd");
-	std::cout << ret << std::endl << std::endl;
-
-	ret = my_basename(" passwd/");
-	std::cout << ret << std::endl;
-	ret = my_dirname(" passwd/");
-	std::cout << ret << std::endl << std::endl;
-
-	ret = my_basename(".. ");
-	std::cout << ret << std::endl;
-	ret = my_dirname("..");
-	std::cout << ret << std::endl << std::endl;
-
-	ret = my_basename(0);
-	std::cout << ret << std::endl;
-	ret = my_dirname(0);
-	std::cout << ret << std::endl << std::endl;
-
-	return 0;
-}
-
-
-
-
 
