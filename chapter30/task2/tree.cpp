@@ -1,6 +1,14 @@
 
 #include "tree.h"
 
+TreeNode::TreeNode(const std::string & vkey,  void * vvalue) : data(vkey, vvalue), left(0), right(0) {
+
+}
+
+TreeNode::~TreeNode(){
+
+}
+
 void initialize(Tree & tree) {
 	tree.root = 0;
 }
@@ -13,7 +21,7 @@ void initialize(Tree & tree) {
  Если K=X, заменить V текущего узла новым значением. (хотя можно и организовать список значений V, но это другая тема)
  */
 
-static void add(TreeNode* &tree, char *key, void *value) {
+static void add(TreeNode* &tree, const char *key, void *value) {
 	if (tree == 0) {
 		tree = new TreeNode(key, value);
 		return;
@@ -31,7 +39,7 @@ static void add(TreeNode* &tree, char *key, void *value) {
 	}
 }
 
-void add(Tree & tree, char *key, void *value) {
+void add(Tree & tree, const char *key, void *value) {
 	add(tree.root, key, value);
 }
 
@@ -107,7 +115,7 @@ static void del(TreeNode* &tree, const char *key) {
 	//} //if (key == tree->key)
 }
 
-void del(Tree & tree, char *key) {
+void del(Tree & tree, const char *key) {
 	del(tree.root, key);
 }
 
@@ -119,7 +127,7 @@ void del(Tree & tree, char *key) {
  Если K<X, рекурсивно искать ключ K в левом поддереве Т.
  */
 
-static bool lookup(const TreeNode * tree, char *key, void **value) {
+static bool lookup(const TreeNode * tree, const char *key, void **value) {
 	if (!tree)
 		return false;
 	if (key == tree->data.key) {
@@ -135,7 +143,7 @@ static bool lookup(const TreeNode * tree, char *key, void **value) {
 	return false;
 }
 
-bool lookup(const Tree & tree, char *key, void **value) {
+bool lookup(const Tree & tree, const char *key, void **value) {
 	return lookup(tree.root, key, value);
 }
 
