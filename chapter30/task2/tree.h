@@ -19,6 +19,8 @@ public:
 	Mutex();
 	Mutex(const Mutex &) = delete;
 	Mutex(Mutex &&) = delete;
+	Mutex & operator =(const Mutex &)= delete;
+	Mutex & operator =(Mutex &&)= delete;
 	~Mutex();
 	void lock() const;
 	void unlock() const;

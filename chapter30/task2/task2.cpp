@@ -30,69 +30,165 @@ extern "C" {
 
 using namespace std;
 
+const int NUM = 26;
+string keys[NUM] = { "apiary", "beetle", "cereal", "danger", "ensign", "florid",
+		"garage", "health", "insult", "jackal", "keeper", "loaner", "manage",
+		"nonce", "onset", "plaid", "quilt", "remote", "stolid", "train",
+		"useful", "valid", "whence", "xenon", "yearn", "zippy" };
+
+int values[NUM];
+
+Tree tree;
+
+static void * fillTreeFunc(void *arg) {
+
+	int * j = (int *) arg;
+
+	for (int i = *j; i < *j + NUM / 2; i++) {
+		add(tree, keys[i].c_str(), &values[i]);
+	}
+
+	return NULL;
+}
+
+static void * lookupTreeFunc(void *arg) {
+
+	int * j = (int *) arg;
+
+	bool f;
+	int count = 0;
+	int * val;
+	for (int i = *j; i < *j + NUM / 2; i++) {
+
+		f = lookup(tree, keys[i].c_str(), (void **) &val);
+		if (!f) {
+			cout << "Can`t find key " << keys[i] << endl;
+		} else {
+			count++;
+		}
+	}
+
+	return (void *) count;
+}
+
+static void * delTreeFunc(void *arg) {
+
+	int * j = (int *) arg;
+
+	for (int i = *j; i < *j + NUM / 2 - 3; i++) {
+		del(tree, keys[i].c_str());
+	}
+
+	return NULL;
+}
+
 int main(int argc, char *argv[]) {
 
-	const int NUM = 26;
-	string keys[NUM] = { "apiary", "beetle", "cereal", "danger", "ensign",
-			"florid", "garage", "health", "insult", "jackal", "keeper",
-			"loaner", "manage", "nonce", "onset", "plaid", "quilt", "remote",
-			"stolid", "train", "useful", "valid", "whence", "xenon", "yearn",
-			"zippy" };
+	int s;
+	pthread_t t1, t2;
 
-	int values[NUM];
 	for (int i = 0; i < NUM; i++) {
 		values[i] = i;
 	}
 
-	Tree tree;
-
 	initialize(tree);
-
 	add(tree, keys[13].c_str(), 0);
 
 	random_shuffle(keys, keys + NUM);
 
-	for (int i = 0; i < NUM; i++) {
-		add(tree, keys[i].c_str(), &values[i]);
-	}
+	//for (int i = 0; i < NUM; i++) {
+	//	add(tree, keys[i].c_str(), &values[i]);
+	//}
 
-	int * val;
-	bool f = lookup(tree, "garage", (void **) &val);
+	int n1 = 0;
+	int n2 = 13;
 
-	f = lookup(tree, "garade", (void **) &val);
+	 //fill tree
+	 s = pthread_create(&t1, NULL, fillTreeFunc, &n1);
+	 if (s != 0)
+	 errExitEN(s, "pthread_create");
+	 s = pthread_create(&t2, NULL, fillTreeFunc, &n2);
+	 if (s != 0)
+	 errExitEN(s, "pthread_create");
 
-	int nv = 30;
-	add(tree, "garage", &nv);
+	 s = pthread_join(t1, NULL);
+	 if (s != 0)
+	 errExitEN(s, "pthread_join");
+	 s = pthread_join(t2, NULL);
+	 if (s != 0)
+	 errExitEN(s, "pthread_join");
+	 //end fill tree
 
-	f = lookup(tree, "garage", (void **) &val);
+
+	//lookup all elements
+	int count1, count2 = 0;
+	s = pthread_create(&t1, NULL, lookupTreeFunc, &n1);
+	if (s != 0)
+		errExitEN(s, "pthread_create");
+	s = pthread_create(&t2, NULL, lookupTreeFunc, &n2);
+	if (s != 0)
+		errExitEN(s, "pthread_create");
+
+	s = pthread_join(t1, (void **) &count1);
+	if (s != 0)
+		errExitEN(s, "pthread_join");
+	s = pthread_join(t2, (void **) &count2);
+	if (s != 0)
+		errExitEN(s, "pthread_join");
+
+	cout << "Found " << count1 + count2 << " nodes" << endl << endl;
+	//end lookup tree
+
+	//del(tree, "garage");
+/*
+	del(tree, keys[0].c_str());
+	del(tree, keys[1].c_str());
+	del(tree, keys[2].c_str());
+	del(tree, keys[3].c_str());
+	del(tree, keys[4].c_str());
+	del(tree, keys[5].c_str());
+	del(tree, keys[6].c_str());
+	del(tree, keys[7].c_str());
+	del(tree, keys[8].c_str());
+	del(tree, keys[9].c_str());
+*/
+	//for (int i = 0; i < 0 + NUM / 2 - 3; i++) {
+	//		del(tree, keys[i].c_str());
+	//}
+
+
+	 //delete 20 elements
+	 cout << "Delete 20 elems" << endl;
+	 s = pthread_create(&t1, NULL, delTreeFunc, &n1);
+	 if (s != 0)
+	 errExitEN(s, "pthread_create");
+	 s = pthread_create(&t2, NULL, delTreeFunc, &n2);
+	 if (s != 0)
+	 errExitEN(s, "pthread_create");
+
+	 s = pthread_join(t1, NULL);
+	 if (s != 0)
+	 errExitEN(s, "pthread_join");
+	 s = pthread_join(t2, NULL);
+	 if (s != 0)
+	 errExitEN(s, "pthread_join");
+	 //end delete 20 elements
+
 
 	int count = 0;
-	for (int i = 0; i < NUM; i++) {
-
-		f = lookup(tree, keys[i].c_str(), (void **) &val);
-		if (!f) {
-			cout << keys[i] << endl;
-		} else {
-			count++;
-		}
-
-	}
-	cout << count << endl;
-
-	del(tree, "garage");
-
-	count = 0;
+	bool f;
+	int * val;
 	for (int i = 0; i < NUM; i++) {
 		if (keys[i] != "garage") {
 			f = lookup(tree, keys[i].c_str(), (void **) &val);
-			if (!f) {
-				cout << keys[i] << endl;
-			} else {
+			if (f) {
+				cout << keys[i] << "\t:\t" << *val << endl;
 				count++;
 			}
 		}
 	}
-	cout << count << endl;
+	cout << "Total " << count << endl;
 
 	exit(EXIT_SUCCESS);
+
 }

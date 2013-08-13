@@ -89,15 +89,15 @@ void add(Tree & tree, const char *key, void *value) {
  Delete it according to one of the two simpler cases above.
  */
 
-static TreeNode * find_min(TreeNode * root) { //Gets minimum node (leftmost leaf) in a subtree
-	root->lock();
-	TreeNode * current_node = root;
-	TreeNode * next_node = current_node->left;
-	while (next_node) {
-		next_node->lock();
-		current_node->unlock();
+static TreeNode* * find_min(TreeNode ** root) { //Gets minimum node (leftmost leaf) in a subtree
+	(*root)->lock();
+	TreeNode* * current_node = root;
+	TreeNode* * next_node = &(*current_node)->left;
+	while (*next_node) {
+		(*next_node)->lock();
+		(*current_node)->unlock();
 		current_node = next_node;
-		next_node = current_node->left;
+		next_node = &(*current_node)->left;
 	}
 	return current_node;
 }
@@ -116,7 +116,7 @@ static void del(TreeNode* &tree, const char *key, Mutex* caller) {
 		return;
 	}
 
-	if (key == tree->data.key && tree->left != 0 && tree->right == 0) {
+	if (key == tree->data.key && tree->left == 0 && tree->right != 0) {
 		TreeNode * tmp = tree->right;
 		delete tree;
 		tree = tmp;
@@ -124,7 +124,7 @@ static void del(TreeNode* &tree, const char *key, Mutex* caller) {
 		return;
 	}
 
-	if (key == tree->data.key && tree->left == 0 && tree->right != 0) {
+	if (key == tree->data.key && tree->left != 0 && tree->right == 0) {
 		TreeNode * tmp = tree->left;
 		delete tree;
 		tree = tmp;
@@ -147,10 +147,10 @@ static void del(TreeNode* &tree, const char *key, Mutex* caller) {
 
 	if (key == tree->data.key && tree->left != 0 && tree->right != 0) {
 
-		TreeNode * successor = find_min(tree->right);
-		tree->data = successor->data;
-		successor->unlock(); //after lock() in find_min(tree->right);
-		del(successor, successor->data.key.c_str(), tree);
+		TreeNode* * successor = find_min(&tree->right);
+		tree->data = (*successor)->data;
+		(*successor)->unlock(); //after lock() in find_min(tree->right);
+		del(*successor, (*successor)->data.key.c_str(), tree);
 
 		return;
 	}
