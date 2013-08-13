@@ -96,9 +96,6 @@ int main(int argc, char *argv[]) {
 
 	random_shuffle(keys, keys + NUM);
 
-	//for (int i = 0; i < NUM; i++) {
-	//	add(tree, keys[i].c_str(), &values[i]);
-	//}
 
 	int n1 = 0;
 	int n2 = 13;
@@ -138,24 +135,6 @@ int main(int argc, char *argv[]) {
 
 	cout << "Found " << count1 + count2 << " nodes" << endl << endl;
 	//end lookup tree
-
-	//del(tree, "garage");
-/*
-	del(tree, keys[0].c_str());
-	del(tree, keys[1].c_str());
-	del(tree, keys[2].c_str());
-	del(tree, keys[3].c_str());
-	del(tree, keys[4].c_str());
-	del(tree, keys[5].c_str());
-	del(tree, keys[6].c_str());
-	del(tree, keys[7].c_str());
-	del(tree, keys[8].c_str());
-	del(tree, keys[9].c_str());
-*/
-	//for (int i = 0; i < 0 + NUM / 2 - 3; i++) {
-	//		del(tree, keys[i].c_str());
-	//}
-
 
 	 //delete 20 elements
 	 cout << "Delete 20 elems" << endl;
