@@ -17,8 +17,10 @@
  */
 
 #include <iostream>
+#include <iomanip>
 #include <string>
 #include <algorithm>
+#include <map>
 
 #include <pthread.h>
 
@@ -30,22 +32,42 @@ extern "C" {
 
 using namespace std;
 
-const int NUM = 26;
-string keys[NUM] = { "apiary", "beetle", "cereal", "danger", "ensign", "florid",
-		"garage", "health", "insult", "jackal", "keeper", "loaner", "manage",
-		"nonce", "onset", "plaid", "quilt", "remote", "stolid", "train",
-		"useful", "valid", "whence", "xenon", "yearn", "zippy" };
+const int NUM = 5000;
+const int NUM_THREADS = 10;
+const int KEY_LEN = 15;
 
-int values[NUM];
+string keys[NUM] = { };
+map<string, int*> nodes;
+int arr[NUM] = { };
 
 Tree tree;
+
+string random_string(size_t length) {
+	auto randchar = []() -> char
+	{
+		const char charset[] =
+		"0123456789"
+		"ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+		"abcdefghijklmnopqrstuvwxyz";
+		const size_t max_index = (sizeof(charset) - 1);
+		return charset[ rand() % max_index ];
+	};
+	string str(length, 0);
+	generate_n(str.begin(), length, randchar);
+	return str;
+}
 
 static void * fillTreeFunc(void *arg) {
 
 	int * j = (int *) arg;
 
-	for (int i = *j; i < *j + NUM / 2; i++) {
-		add(tree, keys[i].c_str(), &values[i]);
+	for (int i = *j; i < *j + NUM / NUM_THREADS; i++) {
+		do {
+			keys[i] = random_string(rand() % KEY_LEN + 1);
+		} while (nodes.find(keys[i]) != nodes.end());
+		arr[i] = rand();
+		nodes[keys[i]] = &arr[i];
+		add(tree, keys[i].c_str(), &arr[i]);
 	}
 
 	return NULL;
@@ -58,11 +80,13 @@ static void * lookupTreeFunc(void *arg) {
 	bool f;
 	int count = 0;
 	int * val;
-	for (int i = *j; i < *j + NUM / 2; i++) {
+	for (int i = *j; i < *j + NUM / NUM_THREADS; i++) {
 
 		f = lookup(tree, keys[i].c_str(), (void **) &val);
 		if (!f) {
-			cout << "Can`t find key " << keys[i] << endl;
+			cerr << "Can`t find key " << keys[i] << endl;
+		} else if (val != nodes[keys[i]]) {
+			cerr << "val != nodes[keys[i]]" << endl;
 		} else {
 			count++;
 		}
@@ -75,7 +99,7 @@ static void * delTreeFunc(void *arg) {
 
 	int * j = (int *) arg;
 
-	for (int i = *j; i < *j + NUM / 2 - 3; i++) {
+	for (int i = *j; i < *j + NUM / NUM_THREADS - 2; i++) {
 		del(tree, keys[i].c_str());
 	}
 
@@ -85,82 +109,69 @@ static void * delTreeFunc(void *arg) {
 int main(int argc, char *argv[]) {
 
 	int s;
-	pthread_t t1, t2;
-
-	for (int i = 0; i < NUM; i++) {
-		values[i] = i;
+	pthread_t t[NUM_THREADS];
+	int inds[NUM_THREADS];
+	for (int i = 0; i < NUM_THREADS; i++) {
+		inds[i] = i * (NUM / NUM_THREADS);
 	}
 
 	initialize(tree);
-	add(tree, keys[13].c_str(), 0);
 
-	random_shuffle(keys, keys + NUM);
+	//fill tree
+	for (int i = 0; i < NUM_THREADS; i++) {
+		s = pthread_create(t + i, NULL, fillTreeFunc, &inds[i]);
+		if (s != 0)
+			errExitEN(s, "pthread_create");
+	}
 
-
-	int n1 = 0;
-	int n2 = 13;
-
-	 //fill tree
-	 s = pthread_create(&t1, NULL, fillTreeFunc, &n1);
-	 if (s != 0)
-	 errExitEN(s, "pthread_create");
-	 s = pthread_create(&t2, NULL, fillTreeFunc, &n2);
-	 if (s != 0)
-	 errExitEN(s, "pthread_create");
-
-	 s = pthread_join(t1, NULL);
-	 if (s != 0)
-	 errExitEN(s, "pthread_join");
-	 s = pthread_join(t2, NULL);
-	 if (s != 0)
-	 errExitEN(s, "pthread_join");
-	 //end fill tree
-
+	for (int i = 0; i < NUM_THREADS; i++) {
+		s = pthread_join(t[i], NULL);
+		if (s != 0)
+			errExitEN(s, "pthread_join");
+	}
+	//end fill tree
 
 	//lookup all elements
-	int count1, count2 = 0;
-	s = pthread_create(&t1, NULL, lookupTreeFunc, &n1);
-	if (s != 0)
-		errExitEN(s, "pthread_create");
-	s = pthread_create(&t2, NULL, lookupTreeFunc, &n2);
-	if (s != 0)
-		errExitEN(s, "pthread_create");
+	int counts[NUM_THREADS];
+	int count = 0;
+	for (int i = 0; i < NUM_THREADS; i++) {
+		s = pthread_create(t + i, NULL, lookupTreeFunc, &inds[i]);
+		if (s != 0)
+			errExitEN(s, "pthread_create");
+	}
 
-	s = pthread_join(t1, (void **) &count1);
-	if (s != 0)
-		errExitEN(s, "pthread_join");
-	s = pthread_join(t2, (void **) &count2);
-	if (s != 0)
-		errExitEN(s, "pthread_join");
-
-	cout << "Found " << count1 + count2 << " nodes" << endl << endl;
+	for (int i = 0; i < NUM_THREADS; i++) {
+		s = pthread_join(t[i], (void **) &counts[i]);
+		if (s != 0)
+			errExitEN(s, "pthread_join");
+		count += counts[i];
+	}
+	cout << "Found " << count << " nodes" << endl << endl;
 	//end lookup tree
 
-	 //delete 20 elements
-	 cout << "Delete 20 elems" << endl;
-	 s = pthread_create(&t1, NULL, delTreeFunc, &n1);
-	 if (s != 0)
-	 errExitEN(s, "pthread_create");
-	 s = pthread_create(&t2, NULL, delTreeFunc, &n2);
-	 if (s != 0)
-	 errExitEN(s, "pthread_create");
+	//delete 20 elements
+	cout << "Delete N-20 elems" << endl;
+	for (int i = 0; i < NUM_THREADS; i++) {
+		s = pthread_create(t + i, NULL, delTreeFunc, &inds[i]);
+		if (s != 0)
+			errExitEN(s, "pthread_create");
+	}
 
-	 s = pthread_join(t1, NULL);
-	 if (s != 0)
-	 errExitEN(s, "pthread_join");
-	 s = pthread_join(t2, NULL);
-	 if (s != 0)
-	 errExitEN(s, "pthread_join");
-	 //end delete 20 elements
+	for (int i = 0; i < NUM_THREADS; i++) {
+		s = pthread_join(t[i], NULL);
+		if (s != 0)
+			errExitEN(s, "pthread_join");
+	}
+	//end delete 20 elements
 
-
-	int count = 0;
+	count = 0;
 	bool f;
 	int * val;
 	for (int i = 0; i < NUM; i++) {
 		if (keys[i] != "garage") {
 			f = lookup(tree, keys[i].c_str(), (void **) &val);
 			if (f) {
+				cout.width(16);
 				cout << keys[i] << "\t:\t" << *val << endl;
 				count++;
 			}
