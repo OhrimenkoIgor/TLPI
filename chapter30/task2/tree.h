@@ -8,7 +8,7 @@
 struct Node {
 	std::string key;
 	void * value;
-	Node(const std::string & vkey = "", void * vvalue = 0) :
+	Node(const std::string & vkey, void * vvalue) :
 			key(vkey), value(vvalue) {
 	}
 };
