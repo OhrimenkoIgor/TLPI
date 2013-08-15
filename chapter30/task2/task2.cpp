@@ -32,7 +32,7 @@ extern "C" {
 
 using namespace std;
 
-const int NUM = 10000;
+const int NUM = 100000;
 const int NUM_THREADS = 10;
 const int KEY_LEN = 15;
 
@@ -62,12 +62,7 @@ static void * fillTreeFunc(void *arg) {
 	int * j = (int *) arg;
 
 	for (int i = *j; i < *j + NUM / NUM_THREADS; i++) {
-		do {
-			keys[i] = random_string(rand() % KEY_LEN + 1);
-		} while (nodes.find(keys[i]) != nodes.end());
-		arr[i] = rand();
-		nodes[keys[i]] = &arr[i];
-		add(tree, keys[i].c_str(), &arr[i]);
+		add(tree, keys[i].c_str(), nodes[keys[i]]);
 	}
 
 	return NULL;
@@ -107,6 +102,14 @@ static void * delTreeFunc(void *arg) {
 }
 
 int main(int argc, char *argv[]) {
+
+	for (int i = 0; i < NUM; i++) {
+		do {
+			keys[i] = random_string(rand() % KEY_LEN + 1);
+		} while (nodes.find(keys[i]) != nodes.end());
+		arr[i] = rand();
+		nodes[keys[i]] = &arr[i];
+	}
 
 	int s;
 	pthread_t t[NUM_THREADS];
@@ -150,7 +153,8 @@ int main(int argc, char *argv[]) {
 	//end lookup tree
 
 	//delete 20 elements
-	cout << "Delete N-20 elems" << endl;
+
+	cout << "Delete N-" << 2 * NUM_THREADS << " elems" << endl;
 	for (int i = 0; i < NUM_THREADS; i++) {
 		s = pthread_create(t + i, NULL, delTreeFunc, &inds[i]);
 		if (s != 0)

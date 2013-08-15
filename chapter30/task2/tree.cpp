@@ -116,24 +116,24 @@ static TreeNode* * find_min(TreeNode ** root) { //Gets minimum node (leftmost le
 	return current_node;
 }
 
-static void del(TreeNode* &tree, const char *key, Mutex* caller
+static void del(TreeNode* &node, const char *key, Mutex* caller
 /*,Mutex* callersCaller,*/
 /*bool treeAlreadyLocked*/) {
-	if (tree == 0) {
+	if (node == 0) {
 		caller->unlock();
 		//if (callersCaller)
 		//	callersCaller->unlock();
 		return;
 	}
 
-	if (key == tree->data.key && !(tree->left != 0 && tree->right != 0)) {
+	if (key == node->data.key && (node->left == 0 || node->right == 0)) {
 		//if (treeAlreadyLocked) {
 		//	tree->unlock();
 		//}
-		TreeNode * tmp = (tree->left) ? tree->left : tree->right;
-		delete tree;
-		tree = tmp;
-		//std::cout << tree << std::endl;
+		TreeNode * tmp = (node->left) ? node->left : node->right;
+		//node->unlock();
+		delete node;
+		node = tmp;
 		caller->unlock();
 		//if (callersCaller)
 		//	callersCaller->unlock();
@@ -143,19 +143,24 @@ static void del(TreeNode* &tree, const char *key, Mutex* caller
 	//if (!treeAlreadyLocked) {
 	//	tree->lock();
 	//}
-	tree->lock();
+	node->lock();
 
-	if (key == tree->data.key && tree->left != 0 && tree->right != 0) {
+	if (key == node->data.key && node->left != 0 && node->right != 0) {
 
-		TreeNode* * successor = find_min(&tree->right);
-		tree->data = (*successor)->data;
-
+		TreeNode* * successor = find_min(&node->right);
+		node->data = (*successor)->data;
+		/*
 		TreeNode * tmp = (*successor)->right;
 		(*successor)->unlock();
 		delete *successor;
 		*successor = tmp;
-		tree->unlock();
+		node->unlock();
 		caller->unlock();
+		*/
+		(*successor)->unlock();
+		del(*successor, (*successor)->data.key.c_str(), node);
+		caller->unlock();
+
 		return;
 	}
 
@@ -163,13 +168,13 @@ static void del(TreeNode* &tree, const char *key, Mutex* caller
 	//if (callersCaller)
 	//	callersCaller->unlock();
 
-	if (key < tree->data.key) {
-		del(tree->left, key, tree/*, caller,*/);
+	if (key < node->data.key) {
+		del(node->left, key, node/*, caller,*/);
 		return;
 	}
 
-	if (key > tree->data.key) {
-		del(tree->right, key, tree/*, caller,*/);
+	if (key > node->data.key) {
+		del(node->right, key, node/*, caller,*/);
 		return;
 	}
 
