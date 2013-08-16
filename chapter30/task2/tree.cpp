@@ -12,7 +12,7 @@ Mutex::Mutex() {
 }
 
 Mutex::~Mutex() {
-	int s = pthread_mutex_destroy(&mutex); /* No longer needed */
+	int s = pthread_mutex_destroy(&mutex);
 	if (s != 0)
 		errExitEN(s, "pthread_mutex_destroy");
 }
@@ -43,38 +43,31 @@ void initialize(Tree & tree) {
  Если K=X, заменить V текущего узла новым значением. (хотя можно и организовать список значений V, но это другая тема)
  */
 
-static void add(TreeNode** tree, const char *key, void *value, Mutex* caller
-/*,	Mutex* callersCaller*/) {
+static void add(TreeNode** tree, const char *key, void *value, Mutex* caller) {
 
 	if (*tree == 0) {
 		*tree = new TreeNode(key, value);
 		caller->unlock();
-		//if (callersCaller)
-		//	callersCaller->unlock();
 		return;
 	}
 
 	(*tree)->lock();
 
 	if (key == (*tree)->data.key) {
-		std::cout << "shouldn't happen\n";
 		(*tree)->data.value = value;
 		(*tree)->unlock();
 		caller->unlock();
-		//if (callersCaller)
-		//	callersCaller->unlock();
 		return;
 	}
 
 	caller->unlock();
-	//if (callersCaller)
-	//	callersCaller->unlock();
+
 	if (key > (*tree)->data.key) {
-		add(&(*tree)->right, key, value, *tree/*, caller*/);
+		add(&(*tree)->right, key, value, *tree);
 		return;
 	}
 	if (key < (*tree)->data.key) {
-		add(&(*tree)->left, key, value, *tree/*, caller*/);
+		add(&(*tree)->left, key, value, *tree);
 		return;
 	}
 
@@ -82,7 +75,7 @@ static void add(TreeNode** tree, const char *key, void *value, Mutex* caller
 
 void add(Tree & tree, const char *key, void *value) {
 	tree.lock();
-	add(&tree.root, key, value, &tree/*, 0*/);
+	add(&tree.root, key, value, &tree);
 }
 
 /*
@@ -103,7 +96,8 @@ void add(Tree & tree, const char *key, void *value) {
  Delete it according to one of the two simpler cases above.
  */
 
-static TreeNode* * find_min(TreeNode ** root) { //Gets minimum node (leftmost leaf) in a subtree
+static TreeNode* * find_min(TreeNode ** root) {
+	//Gets minimum node (leftmost leaf) in a subtree
 	(*root)->lock();
 	TreeNode* * current_node = root;
 	TreeNode* * next_node = &(*current_node)->left;
@@ -116,47 +110,27 @@ static TreeNode* * find_min(TreeNode ** root) { //Gets minimum node (leftmost le
 	return current_node;
 }
 
-static void del(TreeNode* &node, const char *key, Mutex* caller
-/*,Mutex* callersCaller,*/
-/*bool treeAlreadyLocked*/) {
+static void del(TreeNode* &node, const char *key, Mutex* caller) {
 	if (node == 0) {
 		caller->unlock();
-		//if (callersCaller)
-		//	callersCaller->unlock();
 		return;
 	}
 
+	node->lock();
+
 	if (key == node->data.key && (node->left == 0 || node->right == 0)) {
-		//if (treeAlreadyLocked) {
-		//	tree->unlock();
-		//}
 		TreeNode * tmp = (node->left) ? node->left : node->right;
-		//node->unlock();
+		node->unlock();
 		delete node;
 		node = tmp;
 		caller->unlock();
-		//if (callersCaller)
-		//	callersCaller->unlock();
 		return;
 	}
-
-	//if (!treeAlreadyLocked) {
-	//	tree->lock();
-	//}
-	node->lock();
 
 	if (key == node->data.key && node->left != 0 && node->right != 0) {
 
 		TreeNode* * successor = find_min(&node->right);
 		node->data = (*successor)->data;
-		/*
-		TreeNode * tmp = (*successor)->right;
-		(*successor)->unlock();
-		delete *successor;
-		*successor = tmp;
-		node->unlock();
-		caller->unlock();
-		*/
 		(*successor)->unlock();
 		del(*successor, (*successor)->data.key.c_str(), node);
 		caller->unlock();
@@ -165,16 +139,14 @@ static void del(TreeNode* &node, const char *key, Mutex* caller
 	}
 
 	caller->unlock();
-	//if (callersCaller)
-	//	callersCaller->unlock();
 
 	if (key < node->data.key) {
-		del(node->left, key, node/*, caller,*/);
+		del(node->left, key, node);
 		return;
 	}
 
 	if (key > node->data.key) {
-		del(node->right, key, node/*, caller,*/);
+		del(node->right, key, node);
 		return;
 	}
 
@@ -182,7 +154,7 @@ static void del(TreeNode* &node, const char *key, Mutex* caller
 
 void del(Tree & tree, const char *key) {
 	tree.lock();
-	del(tree.root, key, &tree/*, 0,*/);
+	del(tree.root, key, &tree);
 }
 
 /*

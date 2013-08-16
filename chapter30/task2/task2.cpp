@@ -33,7 +33,7 @@ extern "C" {
 using namespace std;
 
 const int NUM = 100000;
-const int NUM_THREADS = 10;
+const int NUM_THREADS = 100;
 const int KEY_LEN = 15;
 
 string keys[NUM] = { };
